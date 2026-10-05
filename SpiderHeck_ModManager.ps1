@@ -1,28 +1,28 @@
+@PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& {param($p) $code = [System.IO.File]::ReadAllText($p) -replace '(?s)^.*?#=POWERSHELL_START=#\r?\n', ''; $sb = [ScriptBlock]::Create($code); & $sb $p}" "%~f0"
+@exit /b
+#=POWERSHELL_START=#
+param($scriptPath)
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ErrorActionPreference = "Stop"
 $host.ui.RawUI.WindowTitle = "SpiderHeck Mod Manager (Windows)"
-$scriptPath =$MyInvocation.MyCommand.Path
-$workDir = Split-Path -Parent$scriptPath
+$workDir = Split-Path -Parent $scriptPath
 Set-Location -Path $workDir
 
-# === KONFIGURACJA =======================================
-$localVersion = "2.0.0"
+$localVersion = "1.1.3"
 $githubRawUrl = "https://raw.githubusercontent.com/coffynerd/Spidh/main"
-# ========================================================
 
-# Sprawdzanie aktualizacji
 $remoteVersion = ""
 try {
     $remoteVersion = (Invoke-RestMethod -Uri "$githubRawUrl/version_win.txt" -TimeoutSec 3).Trim()
 } catch { }
 
-$updateAvailable = ($remoteVersion -ne "") -and ($remoteVersion -ne$localVersion)
+$updateAvailable = ($remoteVersion -ne "") -and ($remoteVersion -ne $localVersion)
 
 function Show-Menu {
     Clear-Host
     Write-Host "===================================================" -ForegroundColor Cyan
     Write-Host "    SpiderHeck - InfiniteFriends Manager (Windows) " -ForegroundColor White
-    Write-Host "    Wersja: $localVersion (System PowerShell)" -ForegroundColor DarkGray
+    Write-Host "    Wersja: $localVersion" -ForegroundColor DarkGray
     Write-Host "===================================================" -ForegroundColor Cyan
     
     if (Test-Path "winhttp.dll") {
@@ -41,14 +41,15 @@ function Show-Menu {
     Write-Host "1. Zainstaluj / Zaktualizuj modyfikacje"
     Write-Host "2. Włącz / Wyłącz moda"
     Write-Host "3. Uruchom grę"
-    Write-Host "4. Napraw skróty (Pulpit i Menu Start)"
+    Write-Host "4. Dodaj skróty (Pulpit i Menu Start)"
     Write-Host "5. Narzędzia Parsec (Gra online)"
     Write-Host "6. Wyjście"
     Write-Host "===================================================" -ForegroundColor Cyan
     
     $choice = Read-Host "Wybierz opcję"
     
-    switch ($choice) {         '0' { if ($updateAvailable) { Update-Script } else { Show-Menu } }
+    switch ($choice) {
+        '0' { if ($updateAvailable) { Update-Script } else { Show-Menu } }
         '1' { Install-Mod }
         '2' { Toggle-Mod }
         '3' { Start-Process "steam://rungameid/1329500"; Show-Menu }
@@ -105,12 +106,12 @@ function Show-ParsecInstructions {
 function Update-Script {
     Write-Host "Pobieranie nowej wersji skryptu..." -ForegroundColor Yellow
     try {
-        Invoke-WebRequest -Uri "$githubRawUrl/SpiderHeck_ModManager.ps1" -OutFile "update.ps1"
-        Copy-Item "update.ps1" -Destination $scriptPath -Force
-        Remove-Item "update.ps1" -Force
+        Invoke-WebRequest -Uri "$githubRawUrl/SpiderHeck_ModManager.bat" -OutFile "update.bat"
+        Copy-Item "update.bat" -Destination $scriptPath -Force
+        Remove-Item "update.bat" -Force
         Write-Host "Aktualizacja zakończona! Skrypt zostanie zrestartowany." -ForegroundColor Green
         Start-Sleep -Seconds 2
-        Start-Process powershell.exe -ArgumentList "-ExecutionPolicy Bypass -File `"$scriptPath`""
+        Start-Process $scriptPath
         exit
     } catch {
         Write-Host "Błąd pobierania aktualizacji: $_" -ForegroundColor Red
@@ -148,6 +149,8 @@ function Toggle-Mod {
     } elseif (Test-Path "winhttp.dll.disabled") {
         Rename-Item -Path "winhttp.dll.disabled" -NewName "winhttp.dll"
         Write-Host "Mod został WŁĄCZONY." -ForegroundColor Green
+    } else {
+        Write-Host "Mod nie jest zainstalowany." -ForegroundColor Red
     }
     Read-Host "Naciśnij Enter, aby wrócić do menu..."
     Show-Menu
@@ -157,19 +160,20 @@ function Create-Shortcuts {
     Write-Host "Tworzenie bezpiecznych skrótów (Pulpit i Menu Start)..." -ForegroundColor Yellow
     $WshShell = New-Object -ComObject WScript.Shell
     
-    $desktop = [Environment]::GetFolderPath('Desktop')$programs = [Environment]::GetFolderPath('Programs')
+    $desktop = [Environment]::GetFolderPath('Desktop')
+    $programs = [Environment]::GetFolderPath('Programs')
 
     # Skrót Pulpit
     $shortcut = $WshShell.CreateShortcut("$desktop\SpiderHeck Mod Manager.lnk")
-    $shortcut.TargetPath = "powershell.exe"
-    $shortcut.Arguments = "-ExecutionPolicy Bypass -File `"$scriptPath`""
-    $shortcut.WorkingDirectory = $workDir$shortcut.Save()
+    $shortcut.TargetPath = $scriptPath
+    $shortcut.WorkingDirectory = $workDir
+    $shortcut.Save()
 
     # Skrót Menu Start
     $shortcut2 = $WshShell.CreateShortcut("$programs\SpiderHeck Mod Manager.lnk")
-    $shortcut2.TargetPath = "powershell.exe"
-    $shortcut2.Arguments = "-ExecutionPolicy Bypass -File `"$scriptPath`""
-    $shortcut2.WorkingDirectory = $workDir$shortcut2.Save()
+    $shortcut2.TargetPath = $scriptPath
+    $shortcut2.WorkingDirectory = $workDir
+    $shortcut2.Save()
 
     Write-Host "Skróty zostały pomyślnie dodane!" -ForegroundColor Green
     Read-Host "Naciśnij Enter, aby wrócić do menu..."
