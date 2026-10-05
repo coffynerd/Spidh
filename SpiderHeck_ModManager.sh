@@ -2,7 +2,7 @@
 cd "$(dirname "$0")"
 
 # === KONFIGURACJA =======================================
-LOCAL_VERSION="1.1"
+LOCAL_VERSION="1.1.1"
 GITHUB_RAW_URL="https://raw.githubusercontent.com/coffynerd/Spidh/main"
 # ========================================================
 
@@ -69,11 +69,39 @@ function show_parsec_menu() {
 
     case $pchoice in
         1) xdg-open "https://web.parsec.app/" ; show_parsec_menu ;;
-        2) xdg-open "https://parsec.app/downloads" ; show_parsec_menu ;;
+        2) install_parsec ;;
         3) show_parsec_instructions ;;
         4) show_menu ;;
         *) show_parsec_menu ;;
     esac
+}
+
+function install_parsec() {
+    clear
+    echo "==================================================="
+    echo " Instalacja Parsec"
+    echo "==================================================="
+    if command -v flatpak &> /dev/null; then
+        echo "Wykryto system Flatpak. Rozpoczynam pobieranie z Flathub..."
+        # Automatyczna instalacja z Flathuba dla użytkownika (omija potrzebę sudo tam, gdzie to możliwe)
+        flatpak install -y --user flathub com.parsecgaming.parsec || flatpak install -y flathub com.parsecgaming.parsec
+        
+        if [ $? -eq 0 ]; then
+            echo -e "\e[32mInstalacja przez Flatpak zakończona sukcesem!\e[0m"
+            echo "Parsec jest gotowy do uruchomienia z menu systemu."
+        else
+            echo -e "\e[31mInstalacja przez Flatpak nie powiodła się lub została przerwana.\e[0m"
+            echo "Otwieram stronę internetową do pobrania ręcznego..."
+            xdg-open "https://parsec.app/downloads"
+        fi
+    else
+        echo "W systemie nie znaleziono obsługi Flatpak."
+        echo "Otwieram stronę internetową do pobrania ręcznego..."
+        xdg-open "https://parsec.app/downloads"
+    fi
+    echo "---------------------------------------------------"
+    read -p "Naciśnij Enter, aby wrócić..."
+    show_parsec_menu
 }
 
 function show_parsec_instructions() {
