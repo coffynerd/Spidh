@@ -2,12 +2,10 @@
 cd "$(dirname "$0")"
 
 # === KONFIGURACJA =======================================
-LOCAL_VERSION="1.0"
-# TUTAJ WKLEJ LINK DO FOLDERU RAW NA GITHUBIE (bez ukośnika na końcu):
+LOCAL_VERSION="1.1"
 GITHUB_RAW_URL="https://raw.githubusercontent.com/coffynerd/Spidh/main"
 # ========================================================
 
-# Sprawdzanie aktualizacji w tle (timeout 3 sekundy, żeby nie blokować jak nie ma neta)
 REMOTE_VERSION=$(curl -s --max-time 3 "$GITHUB_RAW_URL/version_linux.txt" | tr -d '\r' | xargs)
 UPDATE_AVAILABLE=false
 
@@ -38,25 +36,66 @@ function show_menu() {
     echo "2. Włącz / Wyłącz moda"
     echo "3. Uruchom grę"
     echo "4. Dodaj skrót do Menu Aplikacji"
-    echo "5. Wyjście"
+    echo "5. Narzędzia Parsec (Gra online)"
+    echo "6. Wyjście"
     echo "==================================================="
     read -p "Wybierz opcję: " choice
 
     case $choice in
         0) 
-            if [ "$UPDATE_AVAILABLE" = true ]; then
-                update_script
-            else
-                show_menu
-            fi
+            if [ "$UPDATE_AVAILABLE" = true ]; then update_script; else show_menu; fi
             ;;
         1) install_mod ;;
         2) toggle_mod ;;
         3) play_game ;;
         4) create_shortcut ;;
-        5) exit 0 ;;
+        5) show_parsec_menu ;;
+        6) exit 0 ;;
         *) show_menu ;;
     esac
+}
+
+function show_parsec_menu() {
+    clear
+    echo "==================================================="
+    echo "                MENU PARSEC"
+    echo "==================================================="
+    echo "1. Uruchom Parsec w przeglądarce (Web Parsec)"
+    echo "2. Pobierz i zainstaluj aplikację Parsec"
+    echo "3. Instrukcja używania"
+    echo "4. Cofnij"
+    echo "==================================================="
+    read -p "Wybierz opcję: " pchoice
+
+    case $pchoice in
+        1) xdg-open "https://web.parsec.app/" ; show_parsec_menu ;;
+        2) xdg-open "https://parsec.app/downloads" ; show_parsec_menu ;;
+        3) show_parsec_instructions ;;
+        4) show_menu ;;
+        *) show_parsec_menu ;;
+    esac
+}
+
+function show_parsec_instructions() {
+    clear
+    echo "--- JAK UŻYWAĆ PARSEC DO GRY SPIDERHECK ---"
+    echo "1. HOST (Osoba u której odpalona jest gra z modem):"
+    echo "   - Pobiera aplikację, zakłada konto i loguje się."
+    echo "   - W sekcji 'Friends' dodaje swoich znajomych."
+    echo "   - Uruchamia grę SpiderHeck."
+    echo ""
+    echo "2. ZNAJOMI (Goście):"
+    echo "   - Mogą użyć wersji przeglądarkowej (Web Parsec) lub aplikacji."
+    echo "   - Logują się na swoje konto i w sekcji 'Computers' klikają 'Connect'"
+    echo "     przy komputerze Hosta."
+    echo ""
+    echo "3. UPRAWNIENIA:"
+    echo "   - Po dołączeniu gości, HOST klika ikonkę Parsec i upewnia się,"
+    echo "     że goście mają włączone uprawnienia TYLKO do 'Gamepad' (Kontroler)."
+    echo "   - Wyłączcie 'Keyboard' i 'Mouse', żeby goście nie klikali po systemie!"
+    echo "-------------------------------------------"
+    read -p "Naciśnij Enter, aby wrócić..."
+    show_parsec_menu
 }
 
 function update_script() {
@@ -67,7 +106,7 @@ function update_script() {
         chmod +x "$0"
         echo -e "\e[32mAktualizacja zakończona pomyślnie!\e[0m"
         sleep 2
-        exec "$0" # Zrestartuj skrypt
+        exec "$0"
     else
         echo "Błąd podczas pobierania aktualizacji."
         sleep 2
