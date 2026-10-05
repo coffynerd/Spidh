@@ -6,7 +6,7 @@ import os
 import webbrowser
 
 # --- KONFIGURACJA ---
-LOCAL_VERSION = "1.1.17"
+LOCAL_VERSION = "1.1.7"
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/coffynerd/Spidh/main"
 
 def check_update():
