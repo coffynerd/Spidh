@@ -9,7 +9,7 @@ import subprocess
 import webbrowser
 
 # --- KONFIGURACJA ---
-LOCAL_VERSION = "1.1.8"
+LOCAL_VERSION = "1.1.9"
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/coffynerd/Spidh/main"
 
 def check_update():
@@ -70,6 +70,8 @@ def play_game():
 def create_shortcuts():
     try:
         exe_path = os.path.abspath(sys.argv[0])
+        game_dir = os.path.dirname(exe_path)
+        game_exe = os.path.join(game_dir, "SpiderHeck.exe")
         desktop = os.path.join(os.environ['USERPROFILE'], 'Desktop')
         start_menu = os.path.join(os.environ['APPDATA'], 'Microsoft', 'Windows', 'Start Menu', 'Programs')
         
@@ -79,13 +81,15 @@ def create_shortcuts():
         sLinkFile = "{desktop}\\SpiderHeck Mod Manager.lnk"
         Set oLink = oWS.CreateShortcut(sLinkFile)
         oLink.TargetPath = "{exe_path}"
-        oLink.WorkingDirectory = "{os.path.dirname(exe_path)}"
+        oLink.WorkingDirectory = "{game_dir}"
+        oLink.IconLocation = "{game_exe}, 0"
         oLink.Save
         
         sLinkFile2 = "{start_menu}\\SpiderHeck Mod Manager.lnk"
         Set oLink2 = oWS.CreateShortcut(sLinkFile2)
         oLink2.TargetPath = "{exe_path}"
-        oLink2.WorkingDirectory = "{os.path.dirname(exe_path)}"
+        oLink2.WorkingDirectory = "{game_dir}"
+        oLink2.IconLocation = "{game_exe}, 0"
         oLink2.Save
         """
         
@@ -97,7 +101,7 @@ def create_shortcuts():
         creationflags = 0x08000000 if os.name == 'nt' else 0
         subprocess.run(["cscript", "//nologo", vbs_path], creationflags=creationflags)
         
-        messagebox.showinfo("Sukces", "Skróty zostały pomyślnie dodane na Pulpit oraz do Menu Start!")
+        messagebox.showinfo("Sukces", "Skróty z ikoną gry zostały pomyślnie dodane na Pulpit oraz do Menu Start!")
     except Exception as e:
         messagebox.showerror("Błąd", f"Nie udało się utworzyć skrótów:\n{e}")
 
@@ -152,7 +156,7 @@ tk.Label(root, text=f"InfiniteFriends Manager v{LOCAL_VERSION}", font=("Arial", 
 lbl_status = tk.Label(root, text="Sprawdzanie statusu...", font=("Arial", 11, "bold"))
 lbl_status.pack(pady=5)
 
-# Przycisk aktualizacji (domyślnie ukryty, pokaże się po znalezieniu nowej wersji)
+# Przycisk aktualizacji
 btn_update = tk.Button(root, text="", command=download_update, width=35, height=2, bg="#a5d6a7", font=("Arial", 9, "bold"))
 
 btn_install = tk.Button(root, text="1. Zainstaluj / Zaktualizuj modyfikację", command=install_mod, width=35, height=2, bg="#e0e0e0")
