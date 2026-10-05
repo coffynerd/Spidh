@@ -5,7 +5,7 @@ cd /d "%~dp0"
 title SpiderHeck Mod Manager
 
 :: === KONFIGURACJA =======================================
-set LOCAL_VERSION=1.1.1
+set LOCAL_VERSION=1.1.2
 set GITHUB_RAW_URL=https://raw.githubusercontent.com/coffynerd/Spidh/main
 :: ========================================================
 
