@@ -3,10 +3,13 @@ from tkinter import messagebox
 import urllib.request
 import zipfile
 import os
+import sys
+import tempfile
+import subprocess
 import webbrowser
 
 # --- KONFIGURACJA ---
-LOCAL_VERSION = "1.1.7"
+LOCAL_VERSION = "1.1.8"
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/coffynerd/Spidh/main"
 
 def check_update():
@@ -15,37 +18,38 @@ def check_update():
         with urllib.request.urlopen(req, timeout=3) as response:
             remote_version = response.read().decode('utf-8').strip()
             if remote_version and remote_version != LOCAL_VERSION:
-                messagebox.showinfo("Aktualizacja", f"Dostępna jest nowa wersja: {remote_version}!\nPobierz ją z GitHuba.")
+                btn_update.pack(pady=(0, 10))
+                btn_update.config(text=f"⚠️ Dostępna aktualizacja ({remote_version}) - Pobierz")
     except Exception:
         pass
 
+def download_update():
+    webbrowser.open("https://github.com/coffynerd/Spidh/actions")
+    messagebox.showinfo("Aktualizacja", "Pobierz najnowszą wersję programu z zakładki 'Actions' -> 'Zbuduj aplikacje EXE' -> 'Artifacts' na dole strony.")
+
 def install_mod():
     try:
-        messagebox.showinfo("Pobieranie", "Rozpoczynam pobieranie plików. Kliknij OK i poczekaj chwilę...")
+        messagebox.showinfo("Pobieranie", "Rozpoczynam pobieranie plików. Kliknij OK i poczekaj chwilę - program może na moment przestać odpowiadać.")
         
-        # Pobieranie
         bepinex_url = "https://github.com/BepInEx/BepInEx/releases/download/v5.4.22/BepInEx_x64_5.4.22.0.zip"
         mod_url = "https://github.com/Senyksia/InfiniteFriends/releases/latest/download/InfiniteFriends_BepInEx.zip"
         
         urllib.request.urlretrieve(bepinex_url, "bepinex.zip")
         urllib.request.urlretrieve(mod_url, "mod.zip")
         
-        # Rozpakowywanie
         with zipfile.ZipFile("bepinex.zip", 'r') as zip_ref:
             zip_ref.extractall(".")
         with zipfile.ZipFile("mod.zip", 'r') as zip_ref:
             zip_ref.extractall(".")
             
-        # Sprzątanie
         os.remove("bepinex.zip")
         os.remove("mod.zip")
         
-        # Naprawa statusu
         if os.path.exists("winhttp.dll.disabled"):
             os.rename("winhttp.dll.disabled", "winhttp.dll")
             
         update_status()
-        messagebox.showinfo("Sukces", "Mod InfiniteFriends został zainstalowany pomyślnie!")
+        messagebox.showinfo("Sukces", "Instalacja zakończona pomyślnie!\nPamiętaj o parametrach uruchamiania w Steam.")
     except Exception as e:
         messagebox.showerror("Błąd", f"Wystąpił błąd podczas instalacji:\n{e}")
 
@@ -63,8 +67,70 @@ def toggle_mod():
 def play_game():
     webbrowser.open("steam://rungameid/1329500")
 
-def open_parsec():
-    webbrowser.open("https://web.parsec.app/")
+def create_shortcuts():
+    try:
+        exe_path = os.path.abspath(sys.argv[0])
+        desktop = os.path.join(os.environ['USERPROFILE'], 'Desktop')
+        start_menu = os.path.join(os.environ['APPDATA'], 'Microsoft', 'Windows', 'Start Menu', 'Programs')
+        
+        vbs_script = f"""
+        Set oWS = WScript.CreateObject("WScript.Shell")
+        
+        sLinkFile = "{desktop}\\SpiderHeck Mod Manager.lnk"
+        Set oLink = oWS.CreateShortcut(sLinkFile)
+        oLink.TargetPath = "{exe_path}"
+        oLink.WorkingDirectory = "{os.path.dirname(exe_path)}"
+        oLink.Save
+        
+        sLinkFile2 = "{start_menu}\\SpiderHeck Mod Manager.lnk"
+        Set oLink2 = oWS.CreateShortcut(sLinkFile2)
+        oLink2.TargetPath = "{exe_path}"
+        oLink2.WorkingDirectory = "{os.path.dirname(exe_path)}"
+        oLink2.Save
+        """
+        
+        vbs_path = os.path.join(tempfile.gettempdir(), "makeshortcut.vbs")
+        with open(vbs_path, "w", encoding="utf-8") as f:
+            f.write(vbs_script)
+            
+        # Uruchamiamy VBScript bez wyświetlania czarnego okienka konsoli
+        creationflags = 0x08000000 if os.name == 'nt' else 0
+        subprocess.run(["cscript", "//nologo", vbs_path], creationflags=creationflags)
+        
+        messagebox.showinfo("Sukces", "Skróty zostały pomyślnie dodane na Pulpit oraz do Menu Start!")
+    except Exception as e:
+        messagebox.showerror("Błąd", f"Nie udało się utworzyć skrótów:\n{e}")
+
+def show_parsec_menu():
+    parsec_win = tk.Toplevel(root)
+    parsec_win.title("Menu Parsec")
+    parsec_win.geometry("350x300")
+    parsec_win.resizable(False, False)
+    
+    tk.Label(parsec_win, text="Narzędzia Parsec", font=("Arial", 14, "bold")).pack(pady=(15, 10))
+    
+    tk.Button(parsec_win, text="1. Uruchom Web Parsec (Przeglądarka)", command=lambda: webbrowser.open("https://web.parsec.app/"), width=35, height=2, bg="#bbdefb").pack(pady=4)
+    tk.Button(parsec_win, text="2. Pobierz aplikację Parsec", command=lambda: webbrowser.open("https://parsec.app/downloads"), width=35, height=2, bg="#bbdefb").pack(pady=4)
+    tk.Button(parsec_win, text="3. Instrukcja używania", command=show_parsec_instructions, width=35, height=2, bg="#e0e0e0").pack(pady=4)
+    tk.Button(parsec_win, text="4. Cofnij (Zamknij)", command=parsec_win.destroy, width=35, height=2, bg="#ffcdd2").pack(pady=4)
+
+def show_parsec_instructions():
+    inst_text = (
+        "--- JAK UŻYWAĆ PARSEC DO GRY SPIDERHECK ---\n\n"
+        "1. HOST (Osoba u której odpalona jest gra z modem):\n"
+        "   - Pobiera aplikację, zakłada konto i loguje się.\n"
+        "   - W sekcji 'Friends' dodaje swoich znajomych.\n"
+        "   - Uruchamia grę SpiderHeck.\n\n"
+        "2. ZNAJOMI (Goście):\n"
+        "   - Mogą użyć przeglądarki (Web Parsec) lub aplikacji.\n"
+        "   - Logują się na konto i w sekcji 'Computers' klikają 'Connect'\n"
+        "     przy komputerze Hosta.\n\n"
+        "3. UPRAWNIENIA:\n"
+        "   - Po dołączeniu gości, HOST klika ikonkę Parsec i upewnia się,\n"
+        "     że goście mają włączone uprawnienia TYLKO do 'Gamepad'.\n"
+        "   - Wyłączcie 'Keyboard' i 'Mouse', żeby goście nie klikali po systemie!"
+    )
+    messagebox.showinfo("Instrukcja Parsec", inst_text)
 
 def update_status():
     if os.path.exists("winhttp.dll"):
@@ -74,30 +140,39 @@ def update_status():
     else:
         lbl_status.config(text="Status Moda: NIEZAINSTALOWANY", fg="orange")
 
-# --- INTERFEJS GRAFICZNY ---
+# --- INTERFEJS GRAFICZNY (GŁÓWNE OKNO) ---
 root = tk.Tk()
-root.title(f"SpiderHeck Mod Manager v{LOCAL_VERSION}")
-root.geometry("350x400")
+root.title(f"SpiderHeck Mod Manager (Windows)")
+root.geometry("380x520")
 root.resizable(False, False)
 
 tk.Label(root, text="SpiderHeck", font=("Arial", 16, "bold")).pack(pady=(15, 0))
-tk.Label(root, text="InfiniteFriends Manager", font=("Arial", 10)).pack(pady=(0, 15))
+tk.Label(root, text=f"InfiniteFriends Manager v{LOCAL_VERSION}", font=("Arial", 10)).pack(pady=(0, 15))
 
 lbl_status = tk.Label(root, text="Sprawdzanie statusu...", font=("Arial", 11, "bold"))
-lbl_status.pack(pady=10)
+lbl_status.pack(pady=5)
 
-btn_install = tk.Button(root, text="Zainstaluj / Zaktualizuj Moda", command=install_mod, width=30, height=2, bg="#e0e0e0")
-btn_install.pack(pady=5)
+# Przycisk aktualizacji (domyślnie ukryty, pokaże się po znalezieniu nowej wersji)
+btn_update = tk.Button(root, text="", command=download_update, width=35, height=2, bg="#a5d6a7", font=("Arial", 9, "bold"))
 
-btn_toggle = tk.Button(root, text="Włącz / Wyłącz Moda", command=toggle_mod, width=30, height=2, bg="#e0e0e0")
-btn_toggle.pack(pady=5)
+btn_install = tk.Button(root, text="1. Zainstaluj / Zaktualizuj modyfikację", command=install_mod, width=35, height=2, bg="#e0e0e0")
+btn_install.pack(pady=4)
 
-btn_play = tk.Button(root, text="Uruchom Grę", command=play_game, width=30, height=2, bg="#c8e6c9")
-btn_play.pack(pady=5)
+btn_toggle = tk.Button(root, text="2. Włącz / Wyłącz moda", command=toggle_mod, width=35, height=2, bg="#e0e0e0")
+btn_toggle.pack(pady=4)
 
-btn_parsec = tk.Button(root, text="Uruchom Parsec (Gra Online)", command=open_parsec, width=30, height=2, bg="#bbdefb")
-btn_parsec.pack(pady=5)
+btn_play = tk.Button(root, text="3. Uruchom grę", command=play_game, width=35, height=2, bg="#c8e6c9")
+btn_play.pack(pady=4)
+
+btn_shortcut = tk.Button(root, text="4. Dodaj skrót (Pulpit i Menu Start)", command=create_shortcuts, width=35, height=2, bg="#fff9c4")
+btn_shortcut.pack(pady=4)
+
+btn_parsec = tk.Button(root, text="5. Narzędzia Parsec (Gra online)", command=show_parsec_menu, width=35, height=2, bg="#bbdefb")
+btn_parsec.pack(pady=4)
+
+btn_exit = tk.Button(root, text="6. Wyjście", command=root.destroy, width=35, height=2, bg="#ffcdd2")
+btn_exit.pack(pady=4)
 
 update_status()
-root.after(1000, check_update) # Sprawdza aktualizacje sekunde po włączeniu
+root.after(1000, check_update)
 root.mainloop()
