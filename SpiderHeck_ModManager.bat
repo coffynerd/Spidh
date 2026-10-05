@@ -5,7 +5,7 @@ cd /d "%~dp0"
 title SpiderHeck Mod Manager
 
 :: === KONFIGURACJA =======================================
-set LOCAL_VERSION=1.1
+set LOCAL_VERSION=1.1.1
 set GITHUB_RAW_URL=https://raw.githubusercontent.com/coffynerd/Spidh/main
 :: ========================================================
 
@@ -150,10 +150,27 @@ start steam://rungameid/1329500
 goto menu
 
 :shortcut
-echo Tworzenie skrotow...
+echo Tworzenie skrotow (Pulpit i Menu Start)...
 set "SCRIPT_PATH=%~dpnx0"
 set "WORK_DIR=%~dp0"
-powershell -Command "$WshShell = New-Object -ComObject WScript.Shell; $s1 = $WshShell.CreateShortcut([Environment]::GetFolderPath('Desktop') + '\SpiderHeck Mod Manager.lnk'); $s1.TargetPath = '%SCRIPT_PATH%'; $s1.WorkingDirectory = '%WORK_DIR%'; $s1.Save(); $s2 = $WshShell.CreateShortcut([Environment]::GetFolderPath('Programs') + '\SpiderHeck Mod Manager.lnk'); $s2.TargetPath = '%SCRIPT_PATH%'; $s2.WorkingDirectory = '%WORK_DIR%'; $s2.Save()"
-echo Skroty dodane na Pulpit oraz do Menu Start!
+set "VBS_FILE=%temp%\MakeShortcut.vbs"
+
+echo Set oWS = WScript.CreateObject("WScript.Shell") > "%VBS_FILE%"
+echo sLinkFile = oWS.SpecialFolders("Desktop") ^& "\SpiderHeck Mod Manager.lnk" >> "%VBS_FILE%"
+echo Set oLink = oWS.CreateShortcut(sLinkFile) >> "%VBS_FILE%"
+echo oLink.TargetPath = "%SCRIPT_PATH%" >> "%VBS_FILE%"
+echo oLink.WorkingDirectory = "%WORK_DIR%" >> "%VBS_FILE%"
+echo oLink.Save >> "%VBS_FILE%"
+
+echo sLinkFile2 = oWS.SpecialFolders("Programs") ^& "\SpiderHeck Mod Manager.lnk" >> "%VBS_FILE%"
+echo Set oLink2 = oWS.CreateShortcut(sLinkFile2) >> "%VBS_FILE%"
+echo oLink2.TargetPath = "%SCRIPT_PATH%" >> "%VBS_FILE%"
+echo oLink2.WorkingDirectory = "%WORK_DIR%" >> "%VBS_FILE%"
+echo oLink2.Save >> "%VBS_FILE%"
+
+cscript //nologo "%VBS_FILE%" >nul 2>&1
+del "%VBS_FILE%" >nul 2>&1
+
+echo Skroty zostaly pomyslnie dodane!
 pause
 goto menu
