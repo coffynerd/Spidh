@@ -9,8 +9,9 @@ import subprocess
 import webbrowser
 
 # --- KONFIGURACJA ---
-LOCAL_VERSION = "1.1.9"
+LOCAL_VERSION = "1.1.10"
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/coffynerd/Spidh/main"
+GITHUB_EXE_URL = "https://github.com/coffynerd/Spidh/raw/main/SpiderHeckManager.exe"
 
 def check_update():
     try:
@@ -19,13 +20,42 @@ def check_update():
             remote_version = response.read().decode('utf-8').strip()
             if remote_version and remote_version != LOCAL_VERSION:
                 btn_update.pack(pady=(0, 10))
-                btn_update.config(text=f"⚠️ Dostępna aktualizacja ({remote_version}) - Pobierz")
+                btn_update.config(text=f"⚠️ Dostępna aktualizacja ({remote_version}) - Kliknij, aby zaktualizować")
     except Exception:
         pass
 
 def download_update():
-    webbrowser.open("https://github.com/coffynerd/Spidh/actions")
-    messagebox.showinfo("Aktualizacja", "Pobierz najnowszą wersję programu z zakładki 'Actions' -> 'Zbuduj aplikacje EXE' -> 'Artifacts' na dole strony.")
+    try:
+        messagebox.showinfo("Aktualizacja", "Rozpoczynam pobieranie nowej wersji. Program zrestartuje się automatycznie.\nKliknij OK i poczekaj.")
+        
+        # Określanie ścieżek
+        current_exe = sys.executable
+        exe_dir = os.path.dirname(current_exe)
+        new_exe = os.path.join(exe_dir, "update_temp.exe")
+        
+        # Pobieranie nowego pliku .exe
+        urllib.request.urlretrieve(GITHUB_EXE_URL, new_exe)
+        
+        # Tworzenie pliku .bat do bezpiecznej podmiany
+        bat_path = os.path.join(tempfile.gettempdir(), "spidh_updater.bat")
+        bat_content = f"""@echo off
+timeout /t 2 /nobreak >nul
+del "{current_exe}"
+ren "{new_exe}" "{os.path.basename(current_exe)}"
+start "" "{current_exe}"
+del "%~f0"
+"""
+        with open(bat_path, "w", encoding="utf-8") as f:
+            f.write(bat_content)
+            
+        # Odpalenie skryptu w tle (bez czarnego okna) i zamknięcie aplikacji
+        creationflags = 0x08000000 if os.name == 'nt' else 0
+        subprocess.Popen(["cmd.exe", "/c", bat_path], creationflags=creationflags)
+        root.destroy()
+        sys.exit()
+        
+    except Exception as e:
+        messagebox.showerror("Błąd", f"Nie udało się zaktualizować programu:\n{e}")
 
 def install_mod():
     try:
@@ -97,7 +127,6 @@ def create_shortcuts():
         with open(vbs_path, "w", encoding="utf-8") as f:
             f.write(vbs_script)
             
-        # Uruchamiamy VBScript bez wyświetlania czarnego okienka konsoli
         creationflags = 0x08000000 if os.name == 'nt' else 0
         subprocess.run(["cscript", "//nologo", vbs_path], creationflags=creationflags)
         
