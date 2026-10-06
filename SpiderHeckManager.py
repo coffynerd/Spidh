@@ -9,7 +9,7 @@ import subprocess
 import webbrowser
 
 # --- KONFIGURACJA ---
-LOCAL_VERSION = "1.1.10"
+LOCAL_VERSION = "1.1.11"
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/coffynerd/Spidh/main"
 GITHUB_EXE_URL = "https://github.com/coffynerd/Spidh/raw/main/SpiderHeckManager.exe"
 
@@ -20,7 +20,7 @@ def check_update():
             remote_version = response.read().decode('utf-8').strip()
             if remote_version and remote_version != LOCAL_VERSION:
                 btn_update.pack(pady=(0, 10))
-                btn_update.config(text=f"⚠️ Dostępna aktualizacja ({remote_version}) - Kliknij, aby zaktualizować")
+                btn_update.config(text=f"⚠️ Dostępna aktualizacja ({remote_version}) - Kliknij tutaj")
     except Exception:
         pass
 
@@ -28,15 +28,12 @@ def download_update():
     try:
         messagebox.showinfo("Aktualizacja", "Rozpoczynam pobieranie nowej wersji. Program zrestartuje się automatycznie.\nKliknij OK i poczekaj.")
         
-        # Określanie ścieżek
         current_exe = sys.executable
         exe_dir = os.path.dirname(current_exe)
         new_exe = os.path.join(exe_dir, "update_temp.exe")
         
-        # Pobieranie nowego pliku .exe
         urllib.request.urlretrieve(GITHUB_EXE_URL, new_exe)
         
-        # Tworzenie pliku .bat do bezpiecznej podmiany
         bat_path = os.path.join(tempfile.gettempdir(), "spidh_updater.bat")
         bat_content = f"""@echo off
 timeout /t 2 /nobreak >nul
@@ -48,7 +45,6 @@ del "%~f0"
         with open(bat_path, "w", encoding="utf-8") as f:
             f.write(bat_content)
             
-        # Odpalenie skryptu w tle (bez czarnego okna) i zamknięcie aplikacji
         creationflags = 0x08000000 if os.name == 'nt' else 0
         subprocess.Popen(["cmd.exe", "/c", bat_path], creationflags=creationflags)
         root.destroy()
@@ -86,7 +82,7 @@ def install_mod():
 def toggle_mod():
     if os.path.exists("winhttp.dll"):
         os.rename("winhttp.dll", "winhttp.dll.disabled")
-        messagebox.showinfo("Status", "Mod został WYŁĄCZONY (Gra uruchomi się bez limitów usuniętych).")
+        messagebox.showinfo("Status", "Mod został WYŁĄCZONY (Gra uruchomi się bez limitów).")
     elif os.path.exists("winhttp.dll.disabled"):
         os.rename("winhttp.dll.disabled", "winhttp.dll")
         messagebox.showinfo("Status", "Mod został WŁĄCZONY.")
@@ -140,6 +136,14 @@ def show_parsec_menu():
     parsec_win.geometry("350x300")
     parsec_win.resizable(False, False)
     
+    # Próba załadowania ikony również dla podokna
+    try:
+        icon_path = os.path.join(tempfile.gettempdir(), "spidh_logo.png")
+        icon_image = tk.PhotoImage(file=icon_path)
+        parsec_win.iconphoto(False, icon_image)
+    except:
+        pass
+
     tk.Label(parsec_win, text="Narzędzia Parsec", font=("Arial", 14, "bold")).pack(pady=(15, 10))
     
     tk.Button(parsec_win, text="1. Uruchom Web Parsec (Przeglądarka)", command=lambda: webbrowser.open("https://web.parsec.app/"), width=35, height=2, bg="#bbdefb").pack(pady=4)
@@ -178,6 +182,16 @@ root = tk.Tk()
 root.title(f"SpiderHeck Mod Manager (Windows)")
 root.geometry("380x520")
 root.resizable(False, False)
+
+# --- ŁADOWANIE IKONY PROGRAMU ---
+try:
+    icon_path = os.path.join(tempfile.gettempdir(), "spidh_logo.png")
+    if not os.path.exists(icon_path):
+        urllib.request.urlretrieve(f"{GITHUB_RAW_URL}/Site-logo.png", icon_path)
+    icon_image = tk.PhotoImage(file=icon_path)
+    root.iconphoto(True, icon_image)
+except Exception:
+    pass  # Jeśli nie uda się pobrać, aplikacja uruchomi się z domyślną ikonką
 
 tk.Label(root, text="SpiderHeck", font=("Arial", 16, "bold")).pack(pady=(15, 0))
 tk.Label(root, text=f"InfiniteFriends Manager v{LOCAL_VERSION}", font=("Arial", 10)).pack(pady=(0, 15))
