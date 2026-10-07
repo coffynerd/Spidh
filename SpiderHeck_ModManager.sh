@@ -2,7 +2,7 @@
 cd "$(dirname "$0")"
 
 # === KONFIGURACJA =======================================
-LOCAL_VERSION="1.1.1"
+LOCAL_VERSION="1.1.2"
 GITHUB_RAW_URL="https://raw.githubusercontent.com/coffynerd/Spidh/main"
 # ========================================================
 
@@ -35,7 +35,7 @@ function show_menu() {
     echo "1. Zainstaluj / Zaktualizuj modyfikacje"
     echo "2. Włącz / Wyłącz moda"
     echo "3. Uruchom grę"
-    echo "4. Dodaj skrót do Menu Aplikacji"
+    echo "4. Dodaj skróty (Pulpit i Menu Aplikacji)"
     echo "5. Narzędzia Parsec (Gra online)"
     echo "6. Wyjście"
     echo "==================================================="
@@ -48,7 +48,7 @@ function show_menu() {
         1) install_mod ;;
         2) toggle_mod ;;
         3) play_game ;;
-        4) create_shortcut ;;
+        4) create_shortcuts ;;
         5) show_parsec_menu ;;
         6) exit 0 ;;
         *) show_menu ;;
@@ -180,16 +180,58 @@ function play_game() {
     show_menu
 }
 
-function create_shortcut() {
-    DESKTOP_FILE="$HOME/.local/share/applications/spiderheck_mod_manager.desktop"
-    echo "[Desktop Entry]" > "$DESKTOP_FILE"
-    echo "Name=SpiderHeck Mod Manager" >> "$DESKTOP_FILE"
-    echo "Exec=\"$PWD/SpiderHeck_ModManager.sh\"" >> "$DESKTOP_FILE"
-    echo "Terminal=true" >> "$DESKTOP_FILE"
-    echo "Type=Application" >> "$DESKTOP_FILE"
-    chmod +x "$DESKTOP_FILE"
-    echo "Skrót dodany!"
-    read -p "Naciśnij Enter..."
+function create_shortcuts() {
+    clear
+    echo -e "\e[33mTworzenie skrótów dla Linuxa...\e[0m"
+    
+    # Ustalanie dokładnych ścieżek
+    SCRIPT_PATH=$(readlink -f "$0")
+    WORK_DIR=$(dirname "$SCRIPT_PATH")
+    ICON_PATH="$WORK_DIR/spidh_logo.png"
+    
+    # Bezpieczne znajdowanie pulpitu (omija problem nazw "Desktop" vs "Pulpit")
+    DESKTOP_DIR=$(xdg-user-dir DESKTOP 2>/dev/null)
+    if [ -z "$DESKTOP_DIR" ]; then
+        DESKTOP_DIR="$HOME/Desktop"
+    fi
+    
+    APP_DIR="$HOME/.local/share/applications"
+    mkdir -p "$APP_DIR"
+    
+    # Pobieranie logo z GitHuba jeśli go nie ma
+    if [ ! -f "$ICON_PATH" ]; then
+        echo "Pobieranie ikony..."
+        curl -s -L -o "$ICON_PATH" "https://raw.githubusercontent.com/coffynerd/Spidh/main/Site-logo.png"
+    fi
+
+    # Generowanie zawartości pliku .desktop
+    DESKTOP_FILE="[Desktop Entry]
+Version=1.0
+Type=Application
+Name=SpiderHeck Mod Manager
+Comment=Zarządzaj modami do SpiderHeck
+Exec=bash \"$SCRIPT_PATH\"
+Icon=$ICON_PATH
+Terminal=true
+Categories=Utility;Games;
+"
+
+    # Tworzenie skrótu w Menu Start (Aplikacje)
+    echo "$DESKTOP_FILE" > "$APP_DIR/spiderheck-manager.desktop"
+    chmod +x "$APP_DIR/spiderheck-manager.desktop"
+
+    # Tworzenie skrótu na Pulpicie
+    if [ -d "$DESKTOP_DIR" ]; then
+        DESKTOP_FILE_PATH="$DESKTOP_DIR/spiderheck-manager.desktop"
+        echo "$DESKTOP_FILE" > "$DESKTOP_FILE_PATH"
+        chmod +x "$DESKTOP_FILE_PATH"
+        
+        # Wymuszenie "zaufania" dla skrótu (wymagane w nowszych wersjach GNOME/Ubuntu)
+        gio set "$DESKTOP_FILE_PATH" metadata::trusted true 2>/dev/null
+    fi
+
+    echo -e "\e[32mSkróty z ikoną zostały pomyślnie dodane na Pulpit oraz do Menu Aplikacji!\e[0m"
+    read -p "Naciśnij Enter, aby wrócić do menu..."
     show_menu
 }
 
