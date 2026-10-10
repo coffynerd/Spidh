@@ -19,8 +19,10 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: Zainstaluj PyInstaller
-      run: pip install pyinstaller
+    - name: Zainstaluj biblioteki
+      run: |
+        pip install pyinstaller
+        pip install customtkinter
 
     - name: Kompiluj do EXE
       run: pyinstaller --onefile --noconsole --name SpiderHeckManager SpiderHeckManager.py
