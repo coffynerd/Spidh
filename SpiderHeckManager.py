@@ -1,5 +1,6 @@
+import customtkinter as ctk
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 import urllib.request
 import zipfile
 import os
@@ -8,15 +9,19 @@ import tempfile
 import subprocess
 import webbrowser
 import shutil
+import datetime
 
 # --- KONFIGURACJA GŁÓWNA ---
-LOCAL_VERSION = "1.2.2"
+LOCAL_VERSION = "1.3.0"
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/coffynerd/Spidh/main"
 GITHUB_EXE_URL = "https://github.com/coffynerd/Spidh/raw/main/SpiderHeckManager.exe"
 
+# Konfiguracja Wyglądu CustomTkinter
+ctk.set_appearance_mode("dark")  # "light", "dark", "system"
+ctk.set_default_color_theme("blue")  # "blue", "green", "dark-blue"
+
 # --- FUNKCJA POBIERANIA (OMIJająca BŁĄD 403) ---
 def download_file(url, dest):
-    """Pobiera plik udając prawdziwą przeglądarkę, by ominąć blokady serwerów."""
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
@@ -106,37 +111,29 @@ def check_update():
             remote_version = response.read().decode('utf-8').strip()
             if remote_version and remote_version != LOCAL_VERSION:
                 btn_update.pack(pady=(0, 10))
-                btn_update.config(text=f"⚠️ Dostępna aktualizacja ({remote_version}) - Kliknij tutaj")
+                btn_update.configure(text=f"⚠️ Dostępna aktualizacja ({remote_version}) - Kliknij tutaj")
     except Exception:
         pass
 
 def download_update():
     try:
         messagebox.showinfo("Aktualizacja", "Rozpoczynam pobieranie nowej wersji. Program zrestartuje się automatycznie.\nKliknij OK i poczekaj.")
-        
         current_exe = sys.executable
         exe_dir = os.path.dirname(current_exe)
         new_exe = os.path.join(exe_dir, "update_temp.exe")
         
-        # Używamy nowej, bezpiecznej funkcji pobierania
         download_file(GITHUB_EXE_URL, new_exe)
         
-        bat_path = os.path.join(tempfile.gettempdir(), "spidh_updater.bat")
-        bat_content = f"""@echo off
-timeout /t 2 /nobreak >nul
-del "{current_exe}"
-ren "{new_exe}" "{os.path.basename(current_exe)}"
-start "" "{current_exe}"
-del "%~f0"
-"""
-        with open(bat_path, "w", encoding="utf-8") as f:
-            f.write(bat_content)
-            
-        creationflags = 0x08000000 if os.name == 'nt' else 0
-        subprocess.Popen(["cmd.exe", "/c", bat_path], creationflags=creationflags)
-        root.destroy()
-        sys.exit()
-        
+        if os.name == 'nt':
+            bat_path = os.path.join(tempfile.gettempdir(), "spidh_updater.bat")
+            bat_content = f"""@echo off\ntimeout /t 2 /nobreak >nul\ndel "{current_exe}"\nren "{new_exe}" "{os.path.basename(current_exe)}"\nstart "" "{current_exe}"\ndel "%~f0"\n"""
+            with open(bat_path, "w", encoding="utf-8") as f:
+                f.write(bat_content)
+            subprocess.Popen(["cmd.exe", "/c", bat_path], creationflags=0x08000000)
+            root.destroy()
+            sys.exit()
+        else:
+            messagebox.showwarning("Info", "Automatyczny instalator aktualizacji działa tylko na Windowsie (.exe). Pobierz najnowszą wersję Pythona ręcznie.")
     except Exception as e:
         messagebox.showerror("Błąd", f"Nie udało się zaktualizować programu:\n{e}")
 
@@ -145,27 +142,22 @@ def get_mod_status(mod):
     file_path = os.path.join("BepInEx", "plugins", mod['file'])
     dis_file_path = file_path + ".disabled"
     if os.path.exists(file_path):
-        return "WŁĄCZONY", "green"
+        return "WŁĄCZONY", "#2ecc71" # Jasny zielony
     elif os.path.exists(dis_file_path):
-        return "WYŁĄCZONY", "red"
+        return "WYŁĄCZONY", "#e74c3c" # Jasny czerwony
     else:
         return "NIEZAINSTALOWANY", "gray"
 
 def install_bepinex():
     try:
-        messagebox.showinfo("Instalacja", "Rozpoczynam pobieranie silnika BepInEx.\nKliknij OK i poczekaj chwilę - program może na moment przestać odpowiadać.")
-        
+        messagebox.showinfo("Instalacja", "Rozpoczynam pobieranie silnika BepInEx.\nKliknij OK i poczekaj chwilę.")
         bepinex_url = "https://github.com/BepInEx/BepInEx/releases/download/v5.4.22/BepInEx_x64_5.4.22.0.zip"
         download_file(bepinex_url, "bepinex.zip")
-        
         with zipfile.ZipFile("bepinex.zip", 'r') as zip_ref:
             zip_ref.extractall(".")
-            
         os.remove("bepinex.zip")
-        
         if os.path.exists("winhttp.dll.disabled"):
             os.rename("winhttp.dll.disabled", "winhttp.dll")
-            
         update_status()
         messagebox.showinfo("Sukces", "Silnik BepInEx zainstalowany pomyślnie!\nPamiętaj o parametrach uruchamiania w Steam: WINEDLLOVERRIDES=\"winhttp=n,b\" %command%")
     except Exception as e:
@@ -185,101 +177,171 @@ def toggle_bepinex():
 def play_game():
     webbrowser.open("steam://rungameid/1329500")
 
+def open_game_folder():
+    try:
+        if sys.platform == 'win32':
+            os.startfile(os.getcwd())
+        elif sys.platform == 'darwin': # macOS
+            subprocess.Popen(['open', os.getcwd()])
+        else: # Linux
+            subprocess.Popen(['xdg-open', os.getcwd()])
+    except Exception as e:
+        messagebox.showerror("Błąd", f"Nie udało się otworzyć folderu:\n{e}")
+
+def backup_saves():
+    if sys.platform == 'win32':
+        save_dir = os.path.join(os.environ['USERPROFILE'], 'AppData', 'LocalLow', 'Neverjam', 'SpiderHeck')
+    else:
+        # Przykładowa ścieżka dla testów na Linuxie
+        save_dir = os.path.join(os.environ['HOME'], '.steam/steam/steamapps/compatdata/1329500/pfx/drive_c/users/steamuser/AppData/LocalLow/Neverjam/SpiderHeck')
+
+    if os.path.exists(save_dir):
+        try:
+            os.makedirs("Zapisy_KopieZapasowe", exist_ok=True)
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            backup_base = os.path.join("Zapisy_KopieZapasowe", f"SaveBackup_{timestamp}")
+            shutil.make_archive(backup_base, 'zip', save_dir)
+            messagebox.showinfo("Sukces", f"Utworzono kopię zapasową zapisów w folderze:\nZapisy_KopieZapasowe")
+        except Exception as e:
+            messagebox.showerror("Błąd", f"Nie udało się utworzyć kopii zapasowej:\n{e}")
+    else:
+        messagebox.showerror("Błąd", "Nie znaleziono folderu z zapisami gry.")
+
+def hard_reset():
+    if messagebox.askyesno("TWARDY RESET", "Czy na pewno chcesz wykonać reset?\n\nZostaną usunięte WSZYSTKIE mody, configi oraz silnik BepInEx.\nTwoje zapisy stanu gry pozostaną bezpieczne.\n\nGra wróci do 100% oryginalnego stanu."):
+        items_to_remove = ["BepInEx", "winhttp.dll", "winhttp.dll.disabled", "doorstop_config.ini"]
+        try:
+            for item in items_to_remove:
+                if os.path.exists(item):
+                    if os.path.isdir(item):
+                        shutil.rmtree(item, ignore_errors=True)
+                    else:
+                        os.remove(item)
+            update_status()
+            messagebox.showinfo("Sukces", "Modyfikacje zostały całkowicie usunięte z gry.")
+        except Exception as e:
+            messagebox.showerror("Błąd", f"Wystąpił błąd podczas usuwania plików:\n{e}")
+
 def update_status():
     if os.path.exists("winhttp.dll"):
-        lbl_status.config(text="Status Silnika Modów (BepInEx): WŁĄCZONY", fg="green")
+        lbl_status.configure(text="Status Silnika (BepInEx): WŁĄCZONY", text_color="#2ecc71")
     elif os.path.exists("winhttp.dll.disabled"):
-        lbl_status.config(text="Status Silnika Modów (BepInEx): WYŁĄCZONY", fg="red")
+        lbl_status.configure(text="Status Silnika (BepInEx): WYŁĄCZONY", text_color="#e74c3c")
     else:
-        lbl_status.config(text="Status Silnika Modów (BepInEx): NIEZAINSTALOWANY", fg="orange")
+        lbl_status.configure(text="Status Silnika (BepInEx): NIEZAINSTALOWANY", text_color="#f39c12")
 
-# --- MENEDŻER MODÓW (NOWE OKNO) ---
+# --- MENEDŻER MODÓW (NOWY WYGLĄD) ---
 def open_mod_manager():
-    mod_win = tk.Toplevel(root)
+    mod_win = ctk.CTkToplevel(root)
     mod_win.title("Menedżer Modów")
-    mod_win.geometry("640x480")
+    mod_win.geometry("750x520")
     mod_win.resizable(False, False)
-    
-    try:
-        icon_path = os.path.join(tempfile.gettempdir(), "spidh_logo.png")
-        icon_image = tk.PhotoImage(file=icon_path)
-        mod_win.iconphoto(False, icon_image)
-    except:
-        pass
+    mod_win.grab_set() # Blokuje klikanie w główne okno
 
-    # Lewy panel z listą
-    frame_left = tk.Frame(mod_win, width=220)
-    frame_left.pack(side=tk.LEFT, fill=tk.Y, padx=10, pady=10)
+    # Lewy panel z listą modów (Przewijany)
+    frame_left = ctk.CTkScrollableFrame(mod_win, width=220)
+    frame_left.pack(side="left", fill="y", padx=10, pady=10)
     
     # Prawy panel ze szczegółami
-    frame_right = tk.Frame(mod_win)
-    frame_right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-    tk.Label(frame_left, text="Dostępne modyfikacje:", font=("Arial", 11, "bold")).pack(anchor=tk.W)
+    frame_right = ctk.CTkFrame(mod_win)
+    frame_right.pack(side="right", fill="both", expand=True, padx=10, pady=10)
     
-    listbox = tk.Listbox(frame_left, width=30, height=22, font=("Arial", 10), selectbackground="#bbdefb", selectforeground="black")
-    listbox.pack(side=tk.LEFT, fill=tk.Y)
-    
-    scrollbar = tk.Scrollbar(frame_left, command=listbox.yview)
-    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-    listbox.config(yscrollcommand=scrollbar.set)
-    
-    for mod in MODS:
-        listbox.insert(tk.END, mod['name'])
-        
     # Elementy prawego panelu
-    lbl_name = tk.Label(frame_right, text="Wybierz moda z listy po lewej", font=("Arial", 14, "bold"))
-    lbl_name.pack(anchor=tk.NW, pady=(0, 10))
+    lbl_name = ctk.CTkLabel(frame_right, text="Wybierz moda z listy", font=("Arial", 20, "bold"))
+    lbl_name.pack(anchor="nw", padx=15, pady=(15, 5))
     
-    lbl_desc = tk.Label(frame_right, text="", font=("Arial", 10), justify=tk.LEFT, wraplength=350)
-    lbl_desc.pack(anchor=tk.NW, fill=tk.X, pady=(0, 15))
+    lbl_desc = ctk.CTkLabel(frame_right, text="Tutaj pojawi się opis modyfikacji.", font=("Arial", 12), justify="left", wraplength=400)
+    lbl_desc.pack(anchor="nw", padx=15, pady=(0, 15))
     
-    lbl_mod_status = tk.Label(frame_right, text="", font=("Arial", 11, "bold"))
-    lbl_mod_status.pack(anchor=tk.NW, pady=(0, 15))
+    lbl_mod_status = ctk.CTkLabel(frame_right, text="Status: Brak", font=("Arial", 14, "bold"))
+    lbl_mod_status.pack(anchor="nw", padx=15, pady=(0, 15))
     
-    btn_install = tk.Button(frame_right, text="Zainstaluj / Aktualizuj (Pobierz)", width=32, height=2, bg="#a5d6a7", state=tk.DISABLED)
-    btn_install.pack(anchor=tk.NW, pady=5)
+    btn_install = ctk.CTkButton(frame_right, text="Zainstaluj / Aktualizuj (Pobierz z bazy)", state="disabled", height=35)
+    btn_install.pack(anchor="nw", padx=15, pady=5)
     
-    btn_toggle = tk.Button(frame_right, text="Włącz / Wyłącz moda", width=32, height=2, bg="#e0e0e0", state=tk.DISABLED)
-    btn_toggle.pack(anchor=tk.NW, pady=5)
+    btn_toggle = ctk.CTkButton(frame_right, text="Włącz / Wyłącz moda", state="disabled", fg_color="#34495e", hover_color="#2c3e50", height=35)
+    btn_toggle.pack(anchor="nw", padx=15, pady=5)
     
-    tk.Label(frame_right, text="----------------------------------------------------------").pack(anchor=tk.NW, pady=(15, 10))
+    ctk.CTkLabel(frame_right, text="--- NARZĘDZIA ZAAWANSOWANE ---", text_color="gray").pack(anchor="nw", padx=15, pady=(25, 5))
     
-    btn_bepinex = tk.Button(frame_right, text="B. Zainstaluj/Zaktualizuj silnik BepInEx", command=install_bepinex, width=32, height=2, bg="#fff9c4")
-    btn_bepinex.pack(anchor=tk.NW)
+    def install_custom_mod():
+        filepath = filedialog.askopenfilename(title="Wybierz plik moda", filetypes=[("Modyfikacje", "*.dll *.zip")])
+        if filepath:
+            try:
+                os.makedirs(os.path.join("BepInEx", "plugins"), exist_ok=True)
+                if filepath.lower().endswith('.zip'):
+                    with zipfile.ZipFile(filepath, 'r') as zip_ref:
+                        zip_ref.extractall(".")
+                    messagebox.showinfo("Sukces", "Rozpakowano archiwum do folderu z grą.")
+                elif filepath.lower().endswith('.dll'):
+                    shutil.copy(filepath, os.path.join("BepInEx", "plugins"))
+                    messagebox.showinfo("Sukces", "Skopiowano plik .dll do folderu BepInEx/plugins.")
+            except Exception as e:
+                messagebox.showerror("Błąd", f"Wystąpił błąd podczas kopiowania:\n{e}")
 
-    # Akcje po kliknięciu na liście
-    def on_select(event):
-        selection = listbox.curselection()
-        if not selection:
+    def edit_configs():
+        config_dir = os.path.join("BepInEx", "config")
+        if not os.path.exists(config_dir):
+            messagebox.showinfo("Informacja", "Folder 'config' jeszcze nie istnieje. Zainstaluj mody i uruchom grę chociaż raz.")
             return
-        idx = selection[0]
-        mod = MODS[idx]
-        
-        lbl_name.config(text=mod['name'])
-        lbl_desc.config(text=f"Opis:\n{mod['desc']}")
-        
-        status, color = get_mod_status(mod)
-        lbl_mod_status.config(text=f"Status w grze: {status}", fg=color)
-        
-        btn_install.config(state=tk.NORMAL, command=lambda: handle_install(mod, idx))
-        
-        if status == "NIEZAINSTALOWANY":
-            btn_toggle.config(state=tk.DISABLED)
-        else:
-            btn_toggle.config(state=tk.NORMAL, command=lambda: handle_toggle(mod, idx))
-
-    listbox.bind('<<ListboxSelect>>', on_select)
-    
-    def handle_install(mod, idx):
-        if "LINK_DO_" in mod['url']:
-            messagebox.showerror("Błąd", "Link do pobrania tego moda nie został jeszcze skonfigurowany w kodzie programu!")
+        cfgs = [f for f in os.listdir(config_dir) if f.endswith('.cfg')]
+        if not cfgs:
+            messagebox.showinfo("Informacja", "Brak plików konfiguracyjnych w folderze.")
             return
             
+        cfg_win = ctk.CTkToplevel(mod_win)
+        cfg_win.title("Edytor Configów")
+        cfg_win.geometry("350x400")
+        cfg_win.resizable(False, False)
+        
+        ctk.CTkLabel(cfg_win, text="Wybierz plik do edycji:", font=("Arial", 14, "bold")).pack(pady=10)
+        
+        cfg_frame = ctk.CTkScrollableFrame(cfg_win)
+        cfg_frame.pack(fill="both", expand=True, padx=10, pady=5)
+        
+        selected_cfg = tk.StringVar(value="")
+        for c in cfgs:
+            rb = ctk.CTkRadioButton(cfg_frame, text=c, variable=selected_cfg, value=c)
+            rb.pack(anchor="w", pady=5)
+            
+        def open_selected_cfg():
+            val = selected_cfg.get()
+            if val:
+                cfg_path = os.path.join(config_dir, val)
+                if sys.platform == 'win32':
+                    os.startfile(cfg_path)
+                else:
+                    subprocess.Popen(['xdg-open', cfg_path])
+                
+        ctk.CTkButton(cfg_win, text="Otwórz (Systemowy Edytor)", command=open_selected_cfg, height=40).pack(fill="x", padx=10, pady=10)
+    
+    ctk.CTkButton(frame_right, text="Zainstaluj własnego moda (.dll / .zip)", command=install_custom_mod, fg_color="#8e44ad", hover_color="#732d91").pack(anchor="nw", padx=15, pady=4)
+    ctk.CTkButton(frame_right, text="Edytor konfiguracji modów (.cfg)", command=edit_configs, fg_color="#16a085", hover_color="#1abc9c").pack(anchor="nw", padx=15, pady=4)
+    ctk.CTkButton(frame_right, text="Zainstaluj / Zaktualizuj rdzeń BepInEx", command=install_bepinex, fg_color="#c0392b", hover_color="#e74c3c").pack(anchor="nw", padx=15, pady=(20,0))
+
+    # Logika wyboru modów
+    def select_mod(idx):
+        mod = MODS[idx]
+        lbl_name.configure(text=mod['name'])
+        lbl_desc.configure(text=f"Opis:\n{mod['desc']}")
+        status, color = get_mod_status(mod)
+        lbl_mod_status.configure(text=f"Status w grze: {status}", text_color=color)
+        
+        btn_install.configure(state="normal", command=lambda: handle_install(mod, idx))
+        if status == "NIEZAINSTALOWANY":
+            btn_toggle.configure(state="disabled")
+        else:
+            btn_toggle.configure(state="normal", command=lambda: handle_toggle(mod, idx))
+
+    # Generowanie przycisków modów po lewej stronie
+    for i, mod in enumerate(MODS):
+        btn = ctk.CTkButton(frame_left, text=mod['name'], fg_color="transparent", text_color=("gray10", "gray90"), hover_color=("gray70", "gray30"), anchor="w", command=lambda idx=i: select_mod(idx))
+        btn.pack(fill="x", pady=2)
+
+    def handle_install(mod, idx):
         try:
             messagebox.showinfo("Pobieranie", f"Rozpoczęto pobieranie: {mod['name']}...\nKliknij OK i poczekaj.")
             os.makedirs(os.path.join("BepInEx", "plugins"), exist_ok=True)
-            
             if mod['is_zip']:
                 temp_zip = "temp_mod.zip"
                 download_file(mod['url'], temp_zip)
@@ -291,11 +353,8 @@ def open_mod_manager():
                 download_file(mod['url'], target_path)
                 
             dis_path = os.path.join("BepInEx", "plugins", mod['file'] + ".disabled")
-            if os.path.exists(dis_path):
-                os.remove(dis_path)
-                
-            listbox.selection_set(idx)
-            on_select(None)
+            if os.path.exists(dis_path): os.remove(dis_path)
+            select_mod(idx) # Odświeżenie interfejsu
             messagebox.showinfo("Sukces", "Mod zainstalowany!")
         except Exception as e:
             messagebox.showerror("Błąd", f"Wystąpił błąd podczas pobierania:\n{str(e)}")
@@ -303,17 +362,31 @@ def open_mod_manager():
     def handle_toggle(mod, idx):
         file_path = os.path.join("BepInEx", "plugins", mod['file'])
         dis_path = file_path + ".disabled"
-        
-        if os.path.exists(file_path):
-            os.rename(file_path, dis_path)
-        elif os.path.exists(dis_path):
-            os.rename(dis_path, file_path)
-            
-        listbox.selection_set(idx)
-        on_select(None)
+        if os.path.exists(file_path): os.rename(file_path, dis_path)
+        elif os.path.exists(dis_path): os.rename(dis_path, file_path)
+        select_mod(idx)
 
-# --- TWORZENIE SKRÓTÓW I PARSEC ---
+# --- NARZĘDZIA DODATKOWE ---
+def open_tools_menu():
+    tools_win = ctk.CTkToplevel(root)
+    tools_win.title("Narzędzia Dodatkowe")
+    tools_win.geometry("350x400")
+    tools_win.resizable(False, False)
+    tools_win.grab_set()
+    
+    ctk.CTkLabel(tools_win, text="Parsec (Gra Online)", font=("Arial", 14, "bold")).pack(pady=(20, 10))
+    ctk.CTkButton(tools_win, text="Uruchom Web Parsec", command=lambda: webbrowser.open("https://web.parsec.app/")).pack(fill="x", padx=30, pady=5)
+    ctk.CTkButton(tools_win, text="Pobierz aplikację Parsec", command=lambda: webbrowser.open("https://parsec.app/downloads")).pack(fill="x", padx=30, pady=5)
+    ctk.CTkButton(tools_win, text="Instrukcja używania", fg_color="#34495e", hover_color="#2c3e50", command=show_parsec_instructions).pack(fill="x", padx=30, pady=5)
+    
+    ctk.CTkLabel(tools_win, text="Systemowe", font=("Arial", 14, "bold")).pack(pady=(20, 10))
+    ctk.CTkButton(tools_win, text="Utwórz skróty (Pulpit/Start)", command=create_shortcuts, fg_color="#27ae60", hover_color="#2ecc71").pack(fill="x", padx=30, pady=5)
+    ctk.CTkButton(tools_win, text="Zamknij okno", command=tools_win.destroy, fg_color="transparent", border_width=1).pack(fill="x", padx=30, pady=(15, 5))
+
 def create_shortcuts():
+    if sys.platform != 'win32':
+        messagebox.showerror("Błąd", "Ta funkcja działa tylko w systemie Windows.")
+        return
     try:
         exe_path = os.path.abspath(sys.argv[0])
         game_dir = os.path.dirname(exe_path)
@@ -323,14 +396,12 @@ def create_shortcuts():
         
         vbs_script = f"""
         Set oWS = WScript.CreateObject("WScript.Shell")
-        
         sLinkFile = "{desktop}\\SpiderHeck Mod Manager.lnk"
         Set oLink = oWS.CreateShortcut(sLinkFile)
         oLink.TargetPath = "{exe_path}"
         oLink.WorkingDirectory = "{game_dir}"
         oLink.IconLocation = "{game_exe}, 0"
         oLink.Save
-        
         sLinkFile2 = "{start_menu}\\SpiderHeck Mod Manager.lnk"
         Set oLink2 = oWS.CreateShortcut(sLinkFile2)
         oLink2.TargetPath = "{exe_path}"
@@ -338,37 +409,12 @@ def create_shortcuts():
         oLink2.IconLocation = "{game_exe}, 0"
         oLink2.Save
         """
-        
         vbs_path = os.path.join(tempfile.gettempdir(), "makeshortcut.vbs")
-        with open(vbs_path, "w", encoding="utf-8") as f:
-            f.write(vbs_script)
-            
-        creationflags = 0x08000000 if os.name == 'nt' else 0
-        subprocess.run(["cscript", "//nologo", vbs_path], creationflags=creationflags)
-        
+        with open(vbs_path, "w", encoding="utf-8") as f: f.write(vbs_script)
+        subprocess.run(["cscript", "//nologo", vbs_path], creationflags=0x08000000)
         messagebox.showinfo("Sukces", "Skróty z ikoną gry zostały pomyślnie dodane na Pulpit oraz do Menu Start!")
     except Exception as e:
         messagebox.showerror("Błąd", f"Nie udało się utworzyć skrótów:\n{e}")
-
-def show_parsec_menu():
-    parsec_win = tk.Toplevel(root)
-    parsec_win.title("Menu Parsec")
-    parsec_win.geometry("350x300")
-    parsec_win.resizable(False, False)
-    
-    try:
-        icon_path = os.path.join(tempfile.gettempdir(), "spidh_logo.png")
-        icon_image = tk.PhotoImage(file=icon_path)
-        parsec_win.iconphoto(False, icon_image)
-    except:
-        pass
-
-    tk.Label(parsec_win, text="Narzędzia Parsec", font=("Arial", 14, "bold")).pack(pady=(15, 10))
-    
-    tk.Button(parsec_win, text="1. Uruchom Web Parsec (Przeglądarka)", command=lambda: webbrowser.open("https://web.parsec.app/"), width=35, height=2, bg="#bbdefb").pack(pady=4)
-    tk.Button(parsec_win, text="2. Pobierz aplikację Parsec", command=lambda: webbrowser.open("https://parsec.app/downloads"), width=35, height=2, bg="#bbdefb").pack(pady=4)
-    tk.Button(parsec_win, text="3. Instrukcja używania", command=show_parsec_instructions, width=35, height=2, bg="#e0e0e0").pack(pady=4)
-    tk.Button(parsec_win, text="4. Cofnij (Zamknij)", command=parsec_win.destroy, width=35, height=2, bg="#ffcdd2").pack(pady=4)
 
 def show_parsec_instructions():
     inst_text = (
@@ -384,50 +430,56 @@ def show_parsec_instructions():
         "3. UPRAWNIENIA:\n"
         "   - Po dołączeniu gości, HOST klika ikonkę Parsec i upewnia się,\n"
         "     że goście mają włączone uprawnienia TYLKO do 'Gamepad'.\n"
-        "   - Wyłączcie 'Keyboard' i 'Mouse', żeby goście nie klikali po systemie!"
+        "   - Wyłączcie 'Keyboard' i 'Mouse'!"
     )
     messagebox.showinfo("Instrukcja Parsec", inst_text)
 
 # --- INTERFEJS GRAFICZNY (GŁÓWNE OKNO) ---
-root = tk.Tk()
-root.title(f"SpiderHeck Mod Manager (Windows)")
-root.geometry("380x520")
+root = ctk.CTk()
+root.title(f"SpiderHeck Mod Manager")
+root.geometry("450x620")
 root.resizable(False, False)
 
+# Próba wczytania własnej ikonki w starym standardzie tkinter
 try:
     icon_path = os.path.join(tempfile.gettempdir(), "spidh_logo.png")
     if not os.path.exists(icon_path):
         download_file(f"{GITHUB_RAW_URL}/Site-logo.png", icon_path)
     icon_image = tk.PhotoImage(file=icon_path)
-    root.iconphoto(True, icon_image)
+    root.wm_iconphoto(True, icon_image)
 except Exception:
     pass
 
-tk.Label(root, text="SpiderHeck", font=("Arial", 16, "bold")).pack(pady=(15, 0))
-tk.Label(root, text=f"Mod Manager v{LOCAL_VERSION}", font=("Arial", 10)).pack(pady=(0, 15))
+# Nagłówek
+ctk.CTkLabel(root, text="SpiderHeck", font=("Arial", 26, "bold")).pack(pady=(20, 0))
+ctk.CTkLabel(root, text=f"Mod Manager v{LOCAL_VERSION}", font=("Arial", 12), text_color="gray").pack(pady=(0, 15))
 
-lbl_status = tk.Label(root, text="Sprawdzanie statusu...", font=("Arial", 11, "bold"))
+lbl_status = ctk.CTkLabel(root, text="Sprawdzanie statusu...", font=("Arial", 14, "bold"))
 lbl_status.pack(pady=5)
 
-btn_update = tk.Button(root, text="", command=download_update, width=35, height=2, bg="#a5d6a7", font=("Arial", 9, "bold"))
+btn_update = ctk.CTkButton(root, text="", fg_color="#f39c12", hover_color="#d68910", text_color="black", command=download_update)
 
-btn_mods = tk.Button(root, text="1. Zarządzaj Modami (Instalacja, opisy)", command=open_mod_manager, width=35, height=2, bg="#e0e0e0")
-btn_mods.pack(pady=4)
+# Ramka 1: ZARZĄDZANIE MODAMI
+frame_mods = ctk.CTkFrame(root)
+frame_mods.pack(fill="x", padx=25, pady=10)
+ctk.CTkLabel(frame_mods, text="ZARZĄDZANIE MODAMI", font=("Arial", 11, "bold"), text_color="gray").pack(pady=5)
+ctk.CTkButton(frame_mods, text="Otwórz Menedżer Modów", command=open_mod_manager, height=35).pack(fill="x", padx=15, pady=5)
+ctk.CTkButton(frame_mods, text="Włącz / Wyłącz silnik (BepInEx)", command=toggle_bepinex, fg_color="#34495e", hover_color="#2c3e50", height=35).pack(fill="x", padx=15, pady=(5, 10))
 
-btn_toggle_engine = tk.Button(root, text="2. Włącz / Wyłącz WSZYSTKIE mody naraz", command=toggle_bepinex, width=35, height=2, bg="#e0e0e0")
-btn_toggle_engine.pack(pady=4)
+# Ramka 2: GRA I NARZĘDZIA
+frame_tools = ctk.CTkFrame(root)
+frame_tools.pack(fill="x", padx=25, pady=10)
+ctk.CTkLabel(frame_tools, text="GRA I NARZĘDZIA", font=("Arial", 11, "bold"), text_color="gray").pack(pady=5)
+ctk.CTkButton(frame_tools, text="Uruchom grę", command=play_game, fg_color="#27ae60", hover_color="#2ecc71", height=35).pack(fill="x", padx=15, pady=5)
+ctk.CTkButton(frame_tools, text="Otwórz folder z grą", command=open_game_folder, fg_color="#7f8c8d", hover_color="#95a5a6", height=35).pack(fill="x", padx=15, pady=5)
+ctk.CTkButton(frame_tools, text="Kopia zapasowa zapisów", command=backup_saves, fg_color="#8e44ad", hover_color="#9b59b6", height=35).pack(fill="x", padx=15, pady=5)
+ctk.CTkButton(frame_tools, text="Narzędzia Dodatkowe (Parsec, Skróty)", command=open_tools_menu, fg_color="#2980b9", hover_color="#3498db", height=35).pack(fill="x", padx=15, pady=(5, 10))
 
-btn_play = tk.Button(root, text="3. Uruchom grę", command=play_game, width=35, height=2, bg="#c8e6c9")
-btn_play.pack(pady=4)
-
-btn_shortcut = tk.Button(root, text="4. Dodaj skrót (Pulpit i Menu Start)", command=create_shortcuts, width=35, height=2, bg="#fff9c4")
-btn_shortcut.pack(pady=4)
-
-btn_parsec = tk.Button(root, text="5. Narzędzia Parsec (Gra online)", command=show_parsec_menu, width=35, height=2, bg="#bbdefb")
-btn_parsec.pack(pady=4)
-
-btn_exit = tk.Button(root, text="6. Wyjście", command=root.destroy, width=35, height=2, bg="#ffcdd2")
-btn_exit.pack(pady=4)
+# Dolny pasek akcji
+frame_bottom = ctk.CTkFrame(root, fg_color="transparent")
+frame_bottom.pack(fill="x", padx=25, pady=10, side="bottom")
+ctk.CTkButton(frame_bottom, text="TWARDY RESET", command=hard_reset, fg_color="#c0392b", hover_color="#e74c3c", width=150, height=35).pack(side="left")
+ctk.CTkButton(frame_bottom, text="Wyjście", command=root.destroy, fg_color="transparent", border_width=1, width=120, height=35).pack(side="right")
 
 update_status()
 root.after(1000, check_update)
