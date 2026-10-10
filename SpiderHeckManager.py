@@ -10,7 +10,7 @@ import webbrowser
 import shutil
 
 # --- KONFIGURACJA GŁÓWNA ---
-LOCAL_VERSION = "1.2.1"
+LOCAL_VERSION = "1.2.2"
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/coffynerd/Spidh/main"
 GITHUB_EXE_URL = "https://github.com/coffynerd/Spidh/raw/main/SpiderHeckManager.exe"
 
@@ -431,4 +431,4 @@ btn_exit.pack(pady=4)
 
 update_status()
 root.after(1000, check_update)
-root.mainloop() 
+root.mainloop()
