@@ -7,11 +7,22 @@ import sys
 import tempfile
 import subprocess
 import webbrowser
+import shutil
 
 # --- KONFIGURACJA GŁÓWNA ---
-LOCAL_VERSION = "1.2.0"
+LOCAL_VERSION = "1.2.1"
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/coffynerd/Spidh/main"
 GITHUB_EXE_URL = "https://github.com/coffynerd/Spidh/raw/main/SpiderHeckManager.exe"
+
+# --- FUNKCJA POBIERANIA (OMIJająca BŁĄD 403) ---
+def download_file(url, dest):
+    """Pobiera plik udając prawdziwą przeglądarkę, by ominąć blokady serwerów."""
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=15) as response, open(dest, 'wb') as out_file:
+        shutil.copyfileobj(response, out_file)
 
 # --- BAZA DANYCH MODÓW ---
 MODS = [
@@ -107,7 +118,8 @@ def download_update():
         exe_dir = os.path.dirname(current_exe)
         new_exe = os.path.join(exe_dir, "update_temp.exe")
         
-        urllib.request.urlretrieve(GITHUB_EXE_URL, new_exe)
+        # Używamy nowej, bezpiecznej funkcji pobierania
+        download_file(GITHUB_EXE_URL, new_exe)
         
         bat_path = os.path.join(tempfile.gettempdir(), "spidh_updater.bat")
         bat_content = f"""@echo off
@@ -144,7 +156,7 @@ def install_bepinex():
         messagebox.showinfo("Instalacja", "Rozpoczynam pobieranie silnika BepInEx.\nKliknij OK i poczekaj chwilę - program może na moment przestać odpowiadać.")
         
         bepinex_url = "https://github.com/BepInEx/BepInEx/releases/download/v5.4.22/BepInEx_x64_5.4.22.0.zip"
-        urllib.request.urlretrieve(bepinex_url, "bepinex.zip")
+        download_file(bepinex_url, "bepinex.zip")
         
         with zipfile.ZipFile("bepinex.zip", 'r') as zip_ref:
             zip_ref.extractall(".")
@@ -270,20 +282,18 @@ def open_mod_manager():
             
             if mod['is_zip']:
                 temp_zip = "temp_mod.zip"
-                urllib.request.urlretrieve(mod['url'], temp_zip)
+                download_file(mod['url'], temp_zip)
                 with zipfile.ZipFile(temp_zip, 'r') as zip_ref:
                     zip_ref.extractall(".")
                 os.remove(temp_zip)
             else:
                 target_path = os.path.join("BepInEx", "plugins", mod['file'])
-                urllib.request.urlretrieve(mod['url'], target_path)
+                download_file(mod['url'], target_path)
                 
-            # Jeśli mod miał wyłączoną starą wersję, kasujemy ją
             dis_path = os.path.join("BepInEx", "plugins", mod['file'] + ".disabled")
             if os.path.exists(dis_path):
                 os.remove(dis_path)
                 
-            # Odświeżenie interfejsu
             listbox.selection_set(idx)
             on_select(None)
             messagebox.showinfo("Sukces", "Mod zainstalowany!")
@@ -387,7 +397,7 @@ root.resizable(False, False)
 try:
     icon_path = os.path.join(tempfile.gettempdir(), "spidh_logo.png")
     if not os.path.exists(icon_path):
-        urllib.request.urlretrieve(f"{GITHUB_RAW_URL}/Site-logo.png", icon_path)
+        download_file(f"{GITHUB_RAW_URL}/Site-logo.png", icon_path)
     icon_image = tk.PhotoImage(file=icon_path)
     root.iconphoto(True, icon_image)
 except Exception:
@@ -421,4 +431,4 @@ btn_exit.pack(pady=4)
 
 update_status()
 root.after(1000, check_update)
-root.mainloop()
+root.mainloop() 
